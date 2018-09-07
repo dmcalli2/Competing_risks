@@ -1,0 +1,12 @@
+name: competing_risks
+title: competing_risks
+username:
+account: ihwph-hehta
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 414972
+bundleId: 1574741
+url: https://ihwph-hehta.shinyapps.io/competing_risks/
+when: 1536337080.15138
+asMultiple: FALSE
+asStatic: FALSE
