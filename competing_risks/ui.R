@@ -77,8 +77,10 @@ shinyUI(fluidPage(tabsetPanel(
            p("Absolute risk reduction - absolute reduction in risk in people in the treatment group comapred to the control group"),
            h1("References"),
            p("For a discussion of competing risks and a description of the simulations run to create these scenarios see chapter 3 of 'Competing Risks and Multistate Models with R'
-             by Beyersmann, Jan, Allignol, Arthur, Schumacher, Martin, available at https://www.springer.com/gb/book/9781461420347"),
-           p("see https://github.com/dmcalli2/Competing_risks.git for the code used to run the simulation and create the app."))
+             by Beyersmann, Jan, Allignol, Arthur, Schumacher, Martin, available at:-"),
+           a(href = "https://www.springer.com/gb/book/9781461420347", "www.springer.com/gb/book/9781461420347"),
+           p("for the code used to run the simulation and create the app, see:-"),
+           a(href = "https://github.com/dmcalli2/Competing_risks.git", "https://github.com/dmcalli2/Competing_risks.git"))
   )
   )#Close TabSetPanel
   )# CLose ShinyUI
