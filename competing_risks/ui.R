@@ -23,6 +23,8 @@ first_scenario <- first_scenario  %>%
 choices <- map(scenarios %>% select(-scenario), ~
                          unique(.x))
 
+names(choices$rate.main) <- 100* choices$rate.main
+names(choices$rate.compete) <- 100* choices$rate.compete
 names(choices$tx.main) <- round(choices$tx.main, 2)
 names(choices$tx.compete) <- round(choices$tx.compete, 2)
 

@@ -1,5 +1,6 @@
 library(shiny)
 library(tidyverse)
+library(plotly)
 
 effects <- readRDS("simulate_effects.Rds")
 arms <- readRDS("simulate_arms.Rds")
@@ -7,7 +8,9 @@ scenarios <- readRDS("Scenario descriptions.Rds")
 
 ## Relabel arms to make them more informative
 arms <-arms %>% 
-  mutate(arm = if_else(arm == "tx", "Treatment", "Control"))
+  mutate(arm = if_else(arm == "tx", "Treatment", "Control"),
+         risk = n1_cum_per *100) %>% 
+  rename(year = obs.times)
 
 ## Make text labels based on scenario choices
 scenarios <- scenarios %>% 
@@ -69,14 +72,14 @@ shinyServer(function(input, output) {
       filter(scenario %in% scenarios_combine$one) %>% 
        mutate(scenario_old = scenario == tail(scenarios_combine$one, 1))
 
-    ggplot (arms, aes(x = obs.times, y = n1_cum_per, colour = arm, alpha = scenario_old,  
+  ggplot (arms, aes(x = year, y = risk, colour = arm, alpha = scenario_old,  
                       group = interaction(arm,scenario))) + 
       geom_step() +
-      scale_x_continuous("Time (years)") +
-      scale_y_continuous ("Cumulative incidence", limits = c(0,1)) +
-      scale_alpha_discrete(range = c(0.25, 1), guide = FALSE) +
-      scale_color_discrete("")
-    
+      scale_x_continuous("Time (years)", breaks = seq(2,10, 2), minor_breaks = 1:20, limits = c(0, 10)) +
+      scale_y_continuous ("Cumulative incidence (risk, %)", limits = c(0,100), breaks = seq(20, 100, 20),
+                          minor_breaks = seq(10, 100, 10)) +
+      scale_alpha_discrete(range = c(0.25, 1), guide = FALSE) 
+
   })
   
     output$plot_rr <- renderPlot({
@@ -86,7 +89,7 @@ shinyServer(function(input, output) {
 
     ggplot (effects, aes(x = obs.times, y = log(rr), alpha = scenario_old, group = scenario)) + 
       geom_step() +
-      scale_x_continuous("Time (years)", limits = 2, 10) +
+      scale_x_continuous("Time (years)", breaks = seq(1,10, 1), limits = c(0, 10)) +
       scale_y_continuous ("Relative risk for events to time (t)", breaks = seq(-0.5, 0.5, 0.25),
                      labels = round(exp(seq(-0.5, 0.5, 0.25)),2),
                      limits = c(-0.75,0.75)) +
@@ -101,7 +104,7 @@ shinyServer(function(input, output) {
 
     ggplot (effects, aes(x = obs.times, y = log(or), alpha = scenario_old, group = scenario)) + 
       geom_step() +
-      scale_x_continuous("Time (years)", limits = 2, 10) +
+      scale_x_continuous("Time (years)", breaks = seq(1,10, 1), limits = c(0, 10)) +
       scale_y_continuous ("Odds for events to time (t)", breaks = seq(-0.5, 0.5, 0.25),
                      labels = round(exp(seq(-0.5, 0.5, 0.25)),2),
                      limits = c(-0.75,0.75)) +
@@ -115,7 +118,7 @@ shinyServer(function(input, output) {
 
    ggplot (effects, aes(x = obs.times, y = arr, alpha = scenario_old,  group = scenario)) + 
       geom_step() +
-      scale_x_continuous("Time (years)") +
+      scale_x_continuous("Time (years)", breaks = seq(1,10, 1), limits = c(0, 10)) +
       scale_y_continuous ("ARR for events to time (t)") +
       scale_alpha_discrete(range = c(0.5, 1), guide = FALSE)
     
