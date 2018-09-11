@@ -2,9 +2,31 @@ library(shiny)
 library(tidyverse)
 library(plotly)
 
-effects <- readRDS("simulate_effects.Rds")
-arms <- readRDS("simulate_arms.Rds")
-scenarios <- readRDS("Scenario descriptions.Rds")
+# effects <- readRDS("simulate_effects.Rds")
+# arms <- readRDS("simulate_arms.Rds")
+# scenarios <- readRDS("Scenario descriptions.Rds")
+
+## Make cumulative incidence plots
+choose_times <- seq(0, 10, 0.5)
+MakeCumulative <- function (arm, rate.main, rate.compete, times = choose_times){
+  lamda_new <- matrix(NA, ncol = 2, nrow = length(times))
+  p_new <- matrix(NA, ncol = 3, nrow = length(times))
+  cumslam_new <- NA
+
+  lamda_new [,1] <- rate.main 
+  lamda_new [,2] <- rate.compete
+  
+  slam_new <- rowSums(lamda_new[,1:2]) 
+  cumslam_new <- 1 - exp(-slam_new*times)
+
+  # Calculate cumulative incidence for each outcome
+  for (j in 1:2){
+    p_new[,j] <- lamda_new[,j] * cumslam_new /slam_new 
+  }# end of loop through outcomes
+    p_new[,3] <- 1 - rowSums(p_new[,1:2])
+   p_new
+}
+
 
 ## Relabel arms to make them more informative
 arms <-arms %>% 

@@ -7,23 +7,30 @@
 library(tidyverse)
 library(ggplot2)
 
-set.seed (2576)
-mysamples <- 10000
-# Function to create dataframe with samples for arm
-MakeCumulative <- function (arm, rate.main, rate.compete, cens.time = 10, samples = mysamples ){
-  event.times <- rexp(samples, rate.main + rate.compete) # Exponential distribution for time
-  f.cause <- rbinom(samples, size = 1, prob = rate.main/(rate.main+rate.compete)) # Bernoulli distribution
-  f.cause <- ifelse(f.cause == 0, 2, 1)
-  obs.times <- pmin (event.times,cens.time) # censors events occuring after censoring time
-  obs.cause <- c(event.times <= cens.time) * f.cause  
-  mydf <- data.frame (obs.cause, obs.times)
-  mydf$arm <- arm
-  mydf[ , c("arm", "obs.times", "obs.cause")]
+# Function to create dataframe with samples for arm, Welton version
+choose_times <- seq(0, 10, 0.5)
+MakeCumulative <- function (arm, rate.main, rate.compete, times = choose_times){
+  lamda_new <- matrix(NA, ncol = 2, nrow = length(times))
+  p_new <- matrix(NA, ncol = 3, nrow = length(times))
+  cumslam_new <- NA
+
+  lamda_new [,1] <- rate.main 
+  lamda_new [,2] <- rate.compete
+  
+  slam_new <- rowSums(lamda_new[,1:2]) 
+  cumslam_new <- 1 - exp(-slam_new*times)
+
+  # Calculate cumulative incidence for each outcome
+  for (j in 1:2){
+    p_new[,j] <- lamda_new[,j] * cumslam_new /slam_new 
+  }# end of loop through outcomes
+    p_new[,3] <- 1 - rowSums(p_new[,1:2])
+   p_new
 }
 
 ## Create set of scenario options.
-choose_ci <- expand.grid(rate.main = c(10, 20, 40, 80)/100,
-                         rate.compete = c(1, 10, 20, 40, 80)/100,
+choose_ci <- expand.grid(rate.main = c(0, 1, seq(10,90, 10))/100,
+                         rate.compete = c(0, 1, seq(10,90, 10))/100,
                          tx.main = exp(seq(-0.5, 0.5, 0.25)),
                          tx.compete = exp(seq(-0.5, 0.5, 0.25)))
 
@@ -40,54 +47,27 @@ choose_ci <- bind_rows(first,
 simul_res <- map(choose_ci$scenario, function(i){
 
   # Placebo arm
-  mydf.cure.pl <- MakeCumulative (arm = "pl",
+  pl <- MakeCumulative (arm = "pl",
                                   rate.main = choose_ci$rate.main[i],
                                   rate.compete = choose_ci$rate.compete[i])
   # Treatment arm
-  mydf.cure.tx <- MakeCumulative (arm = "tx",
+  tx <- MakeCumulative (arm = "tx",
                                   rate.main = choose_ci$tx.main[i]*choose_ci$rate.main[i],
                                   rate.compete = choose_ci$tx.compete[i]*choose_ci$rate.compete[i])
   
-  # Aggregate data my rouding event times, done to reduce size of dataset
-  AggFunction <- function(mydf){
-    mydf %>% 
-      mutate(obs.times = round(obs.times, 1)) %>% 
-      group_by(arm, obs.times, obs.cause) %>% 
-      count() %>% 
-      ungroup()  %>% 
-      arrange(obs.times) %>% 
-      group_by(arm) %>% 
-      mutate(n_tot = sum(n),
-             n1 = n * as.integer(obs.cause==1),
-             n1_cum = cumsum(n1),
-             n1_cum_per = n1_cum/max(n_tot)) %>% 
-      ungroup() 
-  }
-
-  mydf.cure <- AggFunction(bind_rows(mydf.cure.pl, mydf.cure.tx)) 
+  ## Calculate comparisons
+    arr = pl - tx
+    rr = tx/pl
+    or = (tx/(1-tx)) / (pl/(1-pl)) 
   
-  ## reshape data to alloc calculation of comparisons
-  mydf.cure.pl2 <- mydf.cure %>% 
-    filter(arm == "pl") %>% 
-    distinct(obs.times, n1_cum_per) 
-  mydf.cure.tx2 <- mydf.cure %>% 
-    filter(arm == "tx") %>% 
-    distinct(obs.times, n1_cum_per) 
-  mydf.cure.pl2$n1_cum_per[1] <- NA
-
-mydf.cure2 <- mydf.cure %>%
-    distinct(obs.times) %>% 
-    left_join(mydf.cure.pl2 %>%  select(obs.times, pl = n1_cum_per)) %>% 
-    left_join(mydf.cure.tx2 %>%  select(obs.times, tx = n1_cum_per)) %>% 
-    mutate_at(vars(pl, tx), function(x) if_else(is.na(x), lag(x, default = 0L),  x)) %>% 
-    mutate(arr = pl - tx,
-           rr = tx/pl,
-           or = (tx/(1-tx)) / (pl/(1-pl)) ) %>% 
-    mutate(rr = if_else(rr %in% c(Inf, -Inf), NA_real_, rr),
-           or = if_else(or %in% c(Inf, -Inf), NA_real_, or)) %>% 
-    distinct(obs.times, arr, rr, or) 
-  
-  list(arms = mydf.cure, effects = mydf.cure2)
+    ## Arrange data for plots
+    arms <- bind_rows(tibble(obs.times = choose_times, arm = "pl", n1_cum_per = pl[,1]),
+                      tibble(obs.times = choose_times, arm = "tx", n1_cum_per = tx[,1]))
+    
+    effects <- tibble(obs.times = choose_times,
+                      arr = arr[,1], rr = rr[,1], or = or[,1]) %>% 
+      filter(obs.times !=0)
+  list(arms = arms, effects = effects)
 })
 simul_res <- transpose(simul_res)
 
@@ -101,22 +81,21 @@ effects <- readRDS("simulate_effects.Rds")
 arms <- readRDS("simulate_arms.Rds")
 scenarios = readRDS("Scenario descriptions.Rds")
 
-
 ## For a single scenario, create plots as per the Shiny app
 plot1 <- ggplot (arms %>% filter(scenario %in% 1), aes(x = obs.times, y = n1_cum_per, colour = arm)) + 
-  geom_step() +
+  geom_smooth(se = FALSE) +
   scale_x_continuous("Time (years)") +
   scale_y_continuous ("Cumulative incidence") 
 plot1
 
-plot2 <- ggplot (mydf.cure2, aes(x = obs.times, y = rr)) + 
-  geom_step() +
+plot2 <- ggplot (effects %>% filter(scenario %in% 1), aes(x = obs.times, y = rr)) + 
+  geom_smooth(se = FALSE) +
   scale_x_continuous("Time (years)") +
   scale_y_continuous ("Relative risk for events to time (t)") 
 plot2
 
-plot3 <- ggplot (mydf.cure3, aes(x = obs.times, y = arr)) + 
-  geom_step() +
+plot3 <- ggplot (effects %>% filter(scenario %in% 1), aes(x = obs.times, y = or)) + 
+  geom_smooth(se = FALSE) +
   scale_x_continuous("Time (years)") +
-  scale_y_continuous ("ARR for events to time (t)") 
+  scale_y_continuous ("Odds ratio for events to time (t)") 
 plot3
