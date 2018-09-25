@@ -2,9 +2,31 @@ library(shiny)
 library(tidyverse)
 library(plotly)
 
-effects <- readRDS("simulate_effects.Rds")
-arms <- readRDS("simulate_arms.Rds")
-scenarios <- readRDS("Scenario descriptions.Rds")
+# effects <- readRDS("simulate_effects.Rds")
+# arms <- readRDS("simulate_arms.Rds")
+# scenarios <- readRDS("Scenario descriptions.Rds")
+
+## Make cumulative incidence plots
+choose_times <- seq(0, 10, 0.5)
+MakeCumulative <- function (arm, rate.main, rate.compete, times = choose_times){
+  lamda_new <- matrix(NA, ncol = 2, nrow = length(times))
+  p_new <- matrix(NA, ncol = 3, nrow = length(times))
+  cumslam_new <- NA
+
+  lamda_new [,1] <- rate.main 
+  lamda_new [,2] <- rate.compete
+  
+  slam_new <- rowSums(lamda_new[,1:2]) 
+  cumslam_new <- 1 - exp(-slam_new*times)
+
+  # Calculate cumulative incidence for each outcome
+  for (j in 1:2){
+    p_new[,j] <- lamda_new[,j] * cumslam_new /slam_new 
+  }# end of loop through outcomes
+    p_new[,3] <- 1 - rowSums(p_new[,1:2])
+   p_new
+}
+
 
 ## Relabel arms to make them more informative
 arms <-arms %>% 
@@ -12,38 +34,20 @@ arms <-arms %>%
          risk = n1_cum_per *100) %>% 
   rename(year = obs.times)
 
-## Make text labels based on scenario choices
-scenarios <- scenarios %>% 
-  mutate(output_text = paste0("Rate main = ", rate.main,
-                              ", Rate compete = ", rate.compete,
-                              ", RR main = ", tx.main %>% round(2),
-                              " and RR compete = ", tx.compete %>% round(2)))
-first_scenario <- scenarios %>% 
-  filter(rate.main == min(rate.main), rate.compete == min(rate.compete),
-         tx.main == 1, tx.compete == 1) 
-
-scenarios <- bind_rows(first_scenario,
-                       scenarios) %>% 
-  distinct()
-  
-first_scenario <- first_scenario  %>% 
-  pull(scenario)
-  
 # Create plots for selected scenarios
 shinyServer(function(input, output) {
   
   ## For initial value on opening app
-  scenarios_combine <- reactiveValues(one = c(first_scenario))
-
+  scenarios_combine <- reactiveValues(one = c(1))
 
   scenario_choose <- reactive({
-        # Select data based on choices
+        # Simulate data based on choices
     scenarios <- scenarios %>% 
-      filter((rate.main == input$rate_main &
+      mutate(rate.main == input$rate_main &
              rate.compete == input$rate_compete &
              tx.main == input$tx_main &
-             tx.compete == input$tx_compete)) %>% 
-      slice(1)
+             tx.compete == input$tx_compete,
+             scenario = scenarios_combine$one[1])
     scenarios$scenario
     # 
   })

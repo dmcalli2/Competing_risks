@@ -40,6 +40,7 @@ shinyUI(fluidPage(tabsetPanel(
        radioButtons("rate_main",
                    "Rate of target event per 100 person-years:",
                    choices = choices$rate.main),
+       sliderInput()
        radioButtons("rate_compete",
                    "Rate of competing event per 100 person-years:",
                    choices = choices$rate.compete),
