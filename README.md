@@ -3,3 +3,5 @@ This is the code used to create a shiny app designed to illustrate impact of com
 
 The app is available at https://ihwph-hehta.shinyapps.io/competing_risks/.
 
+
+
