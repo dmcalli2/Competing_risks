@@ -34,38 +34,20 @@ arms <-arms %>%
          risk = n1_cum_per *100) %>% 
   rename(year = obs.times)
 
-## Make text labels based on scenario choices
-scenarios <- scenarios %>% 
-  mutate(output_text = paste0("Rate main = ", rate.main,
-                              ", Rate compete = ", rate.compete,
-                              ", RR main = ", tx.main %>% round(2),
-                              " and RR compete = ", tx.compete %>% round(2)))
-first_scenario <- scenarios %>% 
-  filter(rate.main == min(rate.main), rate.compete == min(rate.compete),
-         tx.main == 1, tx.compete == 1) 
-
-scenarios <- bind_rows(first_scenario,
-                       scenarios) %>% 
-  distinct()
-  
-first_scenario <- first_scenario  %>% 
-  pull(scenario)
-  
 # Create plots for selected scenarios
 shinyServer(function(input, output) {
   
   ## For initial value on opening app
-  scenarios_combine <- reactiveValues(one = c(first_scenario))
-
+  scenarios_combine <- reactiveValues(one = c(1))
 
   scenario_choose <- reactive({
-        # Select data based on choices
+        # Simulate data based on choices
     scenarios <- scenarios %>% 
-      filter((rate.main == input$rate_main &
+      mutate(rate.main == input$rate_main &
              rate.compete == input$rate_compete &
              tx.main == input$tx_main &
-             tx.compete == input$tx_compete)) %>% 
-      slice(1)
+             tx.compete == input$tx_compete,
+             scenario = scenarios_combine$one[1])
     scenarios$scenario
     # 
   })
